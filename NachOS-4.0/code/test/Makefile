@@ -112,7 +112,7 @@ ifeq ($(hosttype),unknown)
 PROGRAMS = unknownhost
 else
 # change this if you create a new test program!
-PROGRAMS = add halt shell matmult sort segments readnum multitest help ascii
+PROGRAMS = add halt shell matmult sort segments readnum multitest help ascii create cat copy delete concatenate
 endif
 
 all: $(PROGRAMS)
@@ -120,6 +120,36 @@ all: $(PROGRAMS)
 
 start.o: start.S ../userprog/syscall.h
 	$(CC) $(CFLAGS) $(ASFLAGS) -c start.S
+
+concatenate: concatenate.o 
+	$(LD) $(LDFLAGS) start.o concatenate.o -o concatenate.coff
+	$(COFF2NOFF) concatenate.coff concatenate
+concatenate.o: concatenate.c 
+	$(CC) $(CFLAGS) -c concatenate.c
+
+delete: delete.o 
+	$(LD) $(LDFLAGS) start.o delete.o -o delete.coff
+	$(COFF2NOFF) delete.coff delete
+delete.o: delete.c 
+	$(CC) $(CFLAGS) -c delete.c
+
+copy: copy.o 
+	$(LD) $(LDFLAGS) start.o copy.o -o copy.coff
+	$(COFF2NOFF) copy.coff copy
+copy.o: copy.c 
+	$(CC) $(CFLAGS) -c copy.c
+
+cat: cat.o 
+	$(LD) $(LDFLAGS) start.o cat.o -o cat.coff
+	$(COFF2NOFF) cat.coff cat
+cat.o: cat.c 
+	$(CC) $(CFLAGS) -c cat.c
+
+create: create.o 
+	$(LD) $(LDFLAGS) start.o create.o -o create.coff
+	$(COFF2NOFF) create.coff create
+create.o: create.c 
+	$(CC) $(CFLAGS) -c create.c
 
 ascii: ascii.o
 	$(LD) $(LDFLAGS) start.o ascii.o -o ascii.coff

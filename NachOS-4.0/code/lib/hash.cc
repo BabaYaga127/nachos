@@ -18,7 +18,7 @@ const int ResizeRatio = 3;	// when do we grow the hash table?
 const int IncreaseSizeBy = 4;	// how much do we grow table when needed?
 
 #include "copyright.h"
-
+#include "hash.h"
 //----------------------------------------------------------------------
 // HashTable<Key,T>::HashTable
 //	Initialize a hash table, empty to start with.

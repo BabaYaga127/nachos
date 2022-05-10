@@ -14,6 +14,10 @@
 #include "kernel.h"
 #include "main.h"
 #include "synchconsole.h"
+#include "hash.h"
+#include "directory.h"
+
+#include <stdio.h>
 
 #define MAX_INT_LENGTH 12
 char _num_buf[MAX_INT_LENGTH+1];
@@ -21,6 +25,7 @@ char _num_buf[MAX_INT_LENGTH+1];
 #define MAX_STRING_LENGTH 255
 char _str_buf[MAX_STRING_LENGTH+1];
 
+// project 01
 void _CaseHalt();
 void _CaseAdd();
 void _CaseReadNum();
@@ -37,6 +42,303 @@ char* User2System(int virtAddr,int limit);
 int System2User(int virtAddr,int len,char* buffer);
 void SysHalt();
 int SysAdd(int op1, int op2);
+
+// project 02
+
+class MyOpenFile{
+  public:
+  OpenFile* file;
+  char* name;
+};
+
+void _CaseCreate();
+void SysCreate(char *name);
+
+void _CaseRemove();
+void SysRemove(char* name);
+
+void _CaseOpen();
+void SysOpen(char* name);
+char* SysGetKeyFromMyOpenFile(MyOpenFile *file);
+unsigned SysGetHashFromKey(char *key);
+
+void _CaseCLose();
+
+void _CaseRead();
+void SysRead(char* buf, int size, MyOpenFile* file);
+
+void _CaseWrite();
+void SysWrite(char* buf, int size, MyOpenFile* file);
+
+void _CaseSeek();
+void SysSeek(int pos, char* name);
+
+
+char* SysGetKeyFromMyOpenFile(MyOpenFile *file) {
+  if (file == 0) {
+    return 0;
+  }
+
+  return file->name;
+}
+
+unsigned int SysGetHashFromKey(char *key) {
+  if (key == 0) {
+    return 0;
+  }
+
+  unsigned int hash = 0;
+  for (unsigned int i = 0; i < strlen(key); ++i) {
+    char c = *(key+i);
+    hash = ((hash << 5) - hash) + c; 
+    hash |= 0;
+  }
+
+  return hash;
+}
+
+HashTable<char*, MyOpenFile*> _unclose_file(&SysGetKeyFromMyOpenFile, &SysGetHashFromKey);
+
+void testhash(char* name) {
+  MyOpenFile *file = new MyOpenFile();
+  MyOpenFile *tmp = 0;
+  
+  file->file = kernel->fileSystem->Open(name);
+  file->name = name;
+
+  SysPrintString("Push: \n");
+  std::cerr << (int)(file) << '\n';
+  _unclose_file.Insert(file);
+
+  file->file->Write("duma", 4);
+
+  SysPrintString("Find: \n");
+  std::cerr << _unclose_file.Find(file->name, &tmp) << '\n';
+  std::cerr << (int)(tmp) << '\n';
+
+  tmp->file->Write("gcc", 3);
+
+  if (tmp != 0) {
+    SysPrintString("Found: \n");
+    SysPrintString(tmp->name);
+    SysPrintString("\n");
+  } 
+
+  SysPrintString("Content: \n");
+
+  memset(_str_buf, '\0', 10);
+  tmp->file->ReadAt(_str_buf, 10, 0);
+
+  SysPrintString(_str_buf);
+
+  SysPrintString("Remove: \n");
+  _unclose_file.Remove(file->name);
+
+  delete file;
+}
+
+void SysWrite(char* buf, int size, MyOpenFile* file) {
+  int check = file->file->Write(buf, size);
+  kernel->machine->WriteRegister(2, check);
+}
+
+void _CaseWrite() {
+  char *buf = 0;
+  MyOpenFile* file = 0;
+  int size;
+
+  buf = (char*)kernel->machine->ReadRegister(4);
+  size = kernel->machine->ReadRegister(5);
+  file = (MyOpenFile*)kernel->machine->ReadRegister(6);
+  if (buf == 0 || size == 0 || file == 0) {
+    SysPrintString("cannot write to file\n\n");
+    kernel->machine->WriteRegister(2, 0);
+    _IncreaseProgramCounter();
+    return;
+  }
+  buf = User2System((int)buf, size);
+  SysWrite(buf, size, file);
+  _IncreaseProgramCounter();
+}
+
+void SysRead(char* buf, int size, MyOpenFile* file) {
+  memset(_str_buf, '\0', size+1);
+  int check = file->file->Read(_str_buf, size);
+  System2User((int)buf, size, _str_buf);
+
+  kernel->machine->WriteRegister(2, check);
+}
+
+void _CaseRead() {
+  char *buf = 0;
+  MyOpenFile* file = 0;
+  int size;
+
+  buf = (char*)kernel->machine->ReadRegister(4);
+  size = kernel->machine->ReadRegister(5);
+  file = (MyOpenFile*)kernel->machine->ReadRegister(6);
+  if (buf == 0 || size == 0 || file == 0) {
+    kernel->machine->WriteRegister(2, 0);
+    _IncreaseProgramCounter();
+    return;
+  }
+
+  SysRead(buf, size, file);
+  _IncreaseProgramCounter();
+}
+
+void SysSeek(int pos, MyOpenFile* file) {
+  SysPrintString("seeking file: \n");
+
+  if (pos == -1) 
+    pos = file->file->Length()-1;
+  pos = max(min(pos, file->file->Length()-1), 0);
+
+  memset(_str_buf, '\0', 5);
+  int check = file->file->ReadAt(_str_buf, 1, pos);
+  if (check == 0) {
+    SysPrintString("error pos \n");
+    kernel->machine->WriteRegister(2, -1);
+    return;
+  }
+
+  SysPrintString("seek success \n");
+  file->file->Seek(pos);
+  kernel->machine->WriteRegister(2, pos);
+}
+
+void _CaseSeek(){
+  char *name;
+  int pos;
+  MyOpenFile *file = 0;
+  pos = kernel->machine->ReadRegister(4);
+  file = (MyOpenFile*)kernel->machine->ReadRegister(5);
+  if (file == 0) {
+    SysPrintString("cannot seek file\n\n");
+    kernel->machine->WriteRegister(2, -1);
+    _IncreaseProgramCounter();
+    return;
+  }
+
+  SysSeek(pos, file);
+  _IncreaseProgramCounter();
+}
+
+void SysRemove(char* name) {
+  MyOpenFile* file = 0;
+  if (_unclose_file.Find(name, &file)) {
+    _unclose_file.Remove(name);
+    delete file;
+  }
+
+  int check = (int)kernel->fileSystem->Remove(name);
+  kernel->machine->WriteRegister(2, check-1);
+}
+
+void _CaseRemove() {
+  char *name;
+  int ptr;
+  ptr = kernel->machine->ReadRegister(4);
+  if (ptr == 0) {
+    SysPrintString("cannot remove file\n");
+    _IncreaseProgramCounter();
+    return;
+  }
+
+  name = User2System(ptr, 255);
+  SysRemove(name);
+  _IncreaseProgramCounter();
+}
+
+void _CaseClose() {
+  MyOpenFile *file = 0;
+  int ptr = kernel->machine->ReadRegister(4);
+  file = (MyOpenFile*)ptr;
+  if (file == 0) {
+    kernel->machine->WriteRegister(2, -1);
+    _IncreaseProgramCounter();
+    return;
+  }
+
+  _unclose_file.Remove(file->name);
+  delete file;
+  kernel->machine->WriteRegister(2, 0);
+  _IncreaseProgramCounter();
+}
+
+void SysOpen(char* name) {
+  MyOpenFile* file = 0;
+
+  if (!_unclose_file.Find(name, &file)) {
+    SysPrintString("Open closed file: ");
+    file = new MyOpenFile();
+    file->file = kernel->fileSystem->Open(name);
+    file->name = name;
+    _unclose_file.Insert(file);
+  } else {
+    SysPrintString("Open opened file: ");
+  }
+
+  SysPrintString(name);
+  SysPrintString("\n");
+
+  if (file->file == 0) {
+    kernel->machine->WriteRegister(2, 0);
+    return;
+  }
+
+  kernel->machine->WriteRegister(2, (int)file);
+}
+
+void _CaseOpen() {
+  char *name;
+  int ptr;
+  ptr = kernel->machine->ReadRegister(4);
+  if (ptr == 0) {
+    SysPrintString("cannot open file\n\n");
+    _IncreaseProgramCounter();
+    return;
+  }
+
+  name = User2System(ptr, 255);
+  SysOpen(name);
+  _IncreaseProgramCounter();
+}
+
+void SysCreate(char *name) {
+  bool check;
+#ifdef FILESYS_STUB
+  check = kernel->fileSystem->Create(name);
+#else 
+  check = kernel->fileSystem->Create(name, 0);
+#endif
+  
+  
+  if (check) 
+    kernel->machine->WriteRegister(2, 0);
+  else 
+    kernel->machine->WriteRegister(2, -1);
+
+  //testhash(name);
+}
+
+void _CaseCreate() {
+  char *name;
+  int ptr;
+  ptr = kernel->machine->ReadRegister(4);
+  if (ptr == 0) {
+    SysPrintString("cannot create file\n\n");
+    kernel->machine->WriteRegister(2, -1);
+    _IncreaseProgramCounter();
+    return;
+  }
+
+  name = User2System(ptr, 255);
+  SysCreate(name);
+  _IncreaseProgramCounter();
+}
+
+// =========================================================================
 
 void _CaseHalt(){
   DEBUG(dbgSys, "Shutdown, initiated by user program.\n");
@@ -170,14 +472,15 @@ void _CaseReadString(){
     if (c == '\n' && i == 0) c = kernel->synchConsoleIn->GetChar();
     _str_buf[i] = c;
 
-    if(i > 0 && c == '\0'){
+    if(i > 0 && (c == '\0' || c == '\n')){
       --i;
       break;
     }
   }
   _str_buf[i+1] = '\0';
+  kernel->machine->WriteRegister(2, i+1);
 
-  System2User(ptr, length+1, _str_buf);
+  System2User(ptr, i+1, _str_buf);
   _IncreaseProgramCounter();
 }
 

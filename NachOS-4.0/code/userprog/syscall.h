@@ -23,15 +23,15 @@
 #define SC_Exec		2
 #define SC_Join		3
 #define SC_Create	4
-#define SC_Remove       5
+#define SC_Remove   5
 #define SC_Open		6
 #define SC_Read		7
 #define SC_Write	8
-#define SC_Seek         9
+#define SC_Seek     9
 #define SC_Close	10
 #define SC_ThreadFork	11
 #define SC_ThreadYield	12
-#define SC_ExecV	13
+#define SC_ExecV	    13
 #define SC_ThreadExit   14
 #define SC_ThreadJoin   15
 
@@ -52,7 +52,7 @@ void PrintNum(int);
 char ReadChar();
 void PrintChar(char);
 int RandomNum();
-void ReadString(char* ptr, int length);
+int ReadString(char* ptr, int length);
 void PrintString(char* ptr);
 
 /* The system call interface.  These are the operations the Nachos

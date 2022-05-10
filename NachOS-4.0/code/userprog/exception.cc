@@ -155,6 +155,34 @@ void _SyscallHandler(int &type){
 		ASSERTNOTREACHED();
 		break;
 
+	case SC_Create:
+		_CaseCreate();
+		return;
+	
+	case SC_Remove:
+		_CaseRemove();
+		return;
+	
+	case SC_Open:
+		_CaseOpen();
+		return;
+
+	case SC_Close:
+		_CaseClose();
+		return;
+
+	case SC_Seek:
+		_CaseSeek();
+		return;
+
+	case SC_Read:
+		_CaseRead();
+		return;
+
+	case SC_Write:
+		_CaseWrite();
+		return;
+
 	default:
 		cerr << "Unexpected system call " << type << "\n";
 		break;
