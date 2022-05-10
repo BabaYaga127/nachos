@@ -3,38 +3,107 @@
 char buf[255];
 char buf2[255];
 
-void ProgCreate(char* write, int writelen, char* name, int namelen, int autoclose) {
-    int check;
-    int fileid = 0;
-    int checksize = 0;
+// Open file by name
+int FileOpenName(char* name, int *fileid) {
+    *fileid = 0;
+
+    PrintString("Open file id: ");
+    *fileid = Open(name);
+    PrintNum(*fileid);
+    PrintString("\n");
+    return *fileid;
+}
+
+// Close file after opened
+void FileAutoClose(int autoclose, int *fileid) {
     int checkclose = 0;
 
-    check = Create(name);
+    if (autoclose) {
+        PrintString("Closing file: ");
+        checkclose = Close(*fileid);
+        PrintNum(checkclose);
+        PrintString("\n");
+    }
+}
 
-    PrintString("Create file status: ");
+// Read file after opened
+void FileRead(char* read, int *readlen, int fileid) {
+    PrintString("Reading file: ");
+    *readlen = Read(read, 255, fileid);
+    PrintNum(*readlen);
+    PrintString("\n");
+}
+
+// write to file after opened
+int FileWrite(char* write, int writelen, int fileid) {
+    PrintString("Writing file: ");
+    writelen = Write(write, writelen, fileid);
+    PrintNum(writelen);
+    PrintString("\n");
+
+    return writelen;
+}
+
+// Create new file by name, close any opened same-name file if exists
+int ProgCreateEmptyFile(char* name) {
+    int check = 0;
+    int fileid = 0;
+
+    PrintString("Creating Empty File: ");
+    PrintString(name);
+    PrintString("\n");
+
+    PrintString("Creating file: ");
+    check = Create(name);
     PrintNum(check);
     PrintString("\n\n");
 
-    if (check != -1) {
-        PrintString("Opening file: ");
-        fileid = Open(name);
-        PrintNum(fileid);
-        PrintString("\n\n");
+    return check+1;
+}
 
-        if (fileid != 0) {
-            PrintString("Writing file: ");
-            checksize = Write(write, writelen, fileid);
-            PrintNum(checksize);
-            PrintString("\n\n");
+// Cat file by name
+void ProgCat(char* read, int *readlen, char* name, int namelen, int autoclose) {
+    int fileid = 0;
 
-            if (autoclose) {
-                PrintString("Closing file: ");
-                checkclose = Close(fileid);
-                PrintNum(checkclose);
-                PrintString("\n\n");
-            }
+    PrintString("Catting File: ");
+    PrintString(name);
+    PrintString("\n");
+
+    if (FileOpenName(name, &fileid)) {
+
+        FileRead(read, readlen, fileid);
+
+        if (*readlen != 0) {
+            PrintString("File content: ");
+            PrintString(read);
+            PrintString("\n");
+        }
+
+        FileAutoClose(autoclose, &fileid);
+    }
+
+    PrintString("\n");
+}
+
+void ProgCreate(char* write, int writelen, char* name, int namelen, int autoclose) {
+    int fileid = 0;
+
+    PrintString("Creating File: ");
+    PrintString(name);
+    PrintString("\n");
+
+    if (ProgCreateEmptyFile(name)) {
+
+        if (FileOpenName(name, &fileid)) {
+
+            // write first content to file;
+            FileWrite(write, writelen, fileid);
+
+            FileAutoClose(autoclose, &fileid);
         }
     }
+
+    PrintString("\n");
 }
 
 int main(){

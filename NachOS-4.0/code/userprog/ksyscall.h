@@ -43,13 +43,101 @@ int System2User(int virtAddr,int len,char* buffer);
 void SysHalt();
 int SysAdd(int op1, int op2);
 
-// project 02
+// ============================================================================================================
 
-class MyOpenFile{
+// project 02
+class MyOpenFile {
+  // wrapper class for openfile
+  // includes hash and name for better file handlings
   public:
   OpenFile* file;
   char* name;
+  unsigned int hash = 0;
+
+  // convert string to hash unsigned int
+  unsigned int GetHash() {
+    if (hash != 0) return hash;
+    if (name == 0) {
+      return 0;
+    }
+
+    for (unsigned int i = 0; i < strlen(name); ++i) {
+      char c = *(name+i);
+      hash = ((hash << 5) - hash) + c; 
+      hash |= 0;
+    }
+
+    return hash;
+  }
 };
+
+#define HASH_MAX_ARR 100
+class MyHash {
+  // local hash array with maximum 100 files opened at the same time.
+public:
+  int n;
+  MyOpenFile* arr[HASH_MAX_ARR];
+
+  MyHash() {
+    memset(arr, 0, HASH_MAX_ARR);
+    n = 0;
+  }
+
+  void Insert(MyOpenFile* file) {
+    int hash = file->GetHash();
+
+    for (int i = 0; i < n; ++i) 
+      if (arr[i]->GetHash() == hash) {
+        return;
+      }
+
+    arr[n] = file;
+    ++n;
+  }
+
+  bool IsInTable(char* name) {
+    MyOpenFile tmp;
+    tmp.name = name;
+
+    for (int i = 0; i < n; ++i) 
+      if (arr[i]->GetHash() == tmp.GetHash()) {
+        return true;
+      }
+    
+    return false;
+  }
+
+  bool Find(char* name, MyOpenFile** file) {
+    MyOpenFile tmp;
+    tmp.name = name;
+
+    for (int i = 0; i < n; ++i) 
+      if (arr[i]->GetHash() == tmp.GetHash()) {
+        *file = arr[i];
+        return true;
+      }
+    
+    return false;
+  }
+
+  void swap(int i, int j) {
+    MyOpenFile* t = arr[i];
+    arr[i] = arr[j];
+    arr[j] = t;
+  }
+
+  void Remove(char* name) {
+    MyOpenFile tmp;
+    tmp.name = name;
+
+    for (int i =0; i < n; ++i)
+      if (arr[i]->GetHash() == tmp.GetHash()) {
+        swap(i, n-1);
+        --n;
+        return;
+      }
+  }
+} _unclose_file;
 
 void _CaseCreate();
 void SysCreate(char *name);
@@ -59,8 +147,6 @@ void SysRemove(char* name);
 
 void _CaseOpen();
 void SysOpen(char* name);
-char* SysGetKeyFromMyOpenFile(MyOpenFile *file);
-unsigned SysGetHashFromKey(char *key);
 
 void _CaseCLose();
 
@@ -73,69 +159,7 @@ void SysWrite(char* buf, int size, MyOpenFile* file);
 void _CaseSeek();
 void SysSeek(int pos, char* name);
 
-
-char* SysGetKeyFromMyOpenFile(MyOpenFile *file) {
-  if (file == 0) {
-    return 0;
-  }
-
-  return file->name;
-}
-
-unsigned int SysGetHashFromKey(char *key) {
-  if (key == 0) {
-    return 0;
-  }
-
-  unsigned int hash = 0;
-  for (unsigned int i = 0; i < strlen(key); ++i) {
-    char c = *(key+i);
-    hash = ((hash << 5) - hash) + c; 
-    hash |= 0;
-  }
-
-  return hash;
-}
-
-HashTable<char*, MyOpenFile*> _unclose_file(&SysGetKeyFromMyOpenFile, &SysGetHashFromKey);
-
-void testhash(char* name) {
-  MyOpenFile *file = new MyOpenFile();
-  MyOpenFile *tmp = 0;
-  
-  file->file = kernel->fileSystem->Open(name);
-  file->name = name;
-
-  SysPrintString("Push: \n");
-  std::cerr << (int)(file) << '\n';
-  _unclose_file.Insert(file);
-
-  file->file->Write("duma", 4);
-
-  SysPrintString("Find: \n");
-  std::cerr << _unclose_file.Find(file->name, &tmp) << '\n';
-  std::cerr << (int)(tmp) << '\n';
-
-  tmp->file->Write("gcc", 3);
-
-  if (tmp != 0) {
-    SysPrintString("Found: \n");
-    SysPrintString(tmp->name);
-    SysPrintString("\n");
-  } 
-
-  SysPrintString("Content: \n");
-
-  memset(_str_buf, '\0', 10);
-  tmp->file->ReadAt(_str_buf, 10, 0);
-
-  SysPrintString(_str_buf);
-
-  SysPrintString("Remove: \n");
-  _unclose_file.Remove(file->name);
-
-  delete file;
-}
+// ============================================================================================================
 
 void SysWrite(char* buf, int size, MyOpenFile* file) {
   int check = file->file->Write(buf, size);
@@ -150,6 +174,8 @@ void _CaseWrite() {
   buf = (char*)kernel->machine->ReadRegister(4);
   size = kernel->machine->ReadRegister(5);
   file = (MyOpenFile*)kernel->machine->ReadRegister(6);
+
+  // check null pointer
   if (buf == 0 || size == 0 || file == 0) {
     SysPrintString("cannot write to file\n\n");
     kernel->machine->WriteRegister(2, 0);
@@ -160,6 +186,8 @@ void _CaseWrite() {
   SysWrite(buf, size, file);
   _IncreaseProgramCounter();
 }
+
+// ============================================================================================================
 
 void SysRead(char* buf, int size, MyOpenFile* file) {
   memset(_str_buf, '\0', size+1);
@@ -187,9 +215,9 @@ void _CaseRead() {
   _IncreaseProgramCounter();
 }
 
-void SysSeek(int pos, MyOpenFile* file) {
-  SysPrintString("seeking file: \n");
+// ============================================================================================================
 
+void SysSeek(int pos, MyOpenFile* file) {
   if (pos == -1) 
     pos = file->file->Length()-1;
   pos = max(min(pos, file->file->Length()-1), 0);
@@ -197,12 +225,10 @@ void SysSeek(int pos, MyOpenFile* file) {
   memset(_str_buf, '\0', 5);
   int check = file->file->ReadAt(_str_buf, 1, pos);
   if (check == 0) {
-    SysPrintString("error pos \n");
     kernel->machine->WriteRegister(2, -1);
     return;
   }
 
-  SysPrintString("seek success \n");
   file->file->Seek(pos);
   kernel->machine->WriteRegister(2, pos);
 }
@@ -224,8 +250,12 @@ void _CaseSeek(){
   _IncreaseProgramCounter();
 }
 
+// ============================================================================================================
+
 void SysRemove(char* name) {
   MyOpenFile* file = 0;
+
+  // if file is opened, close it then remove
   if (_unclose_file.Find(name, &file)) {
     _unclose_file.Remove(name);
     delete file;
@@ -250,43 +280,46 @@ void _CaseRemove() {
   _IncreaseProgramCounter();
 }
 
+// ============================================================================================================
+
 void _CaseClose() {
   MyOpenFile *file = 0;
-  int ptr = kernel->machine->ReadRegister(4);
-  file = (MyOpenFile*)ptr;
+  file = (MyOpenFile*)kernel->machine->ReadRegister(4);
+
   if (file == 0) {
     kernel->machine->WriteRegister(2, -1);
     _IncreaseProgramCounter();
     return;
   }
 
-  _unclose_file.Remove(file->name);
-  delete file;
+  if (_unclose_file.Find(file->name, &file)) {
+    _unclose_file.Remove(file->name);
+    delete file;
+  }
+  
   kernel->machine->WriteRegister(2, 0);
   _IncreaseProgramCounter();
 }
 
+// ============================================================================================================
+
 void SysOpen(char* name) {
   MyOpenFile* file = 0;
 
+  // check if file is opened already
   if (!_unclose_file.Find(name, &file)) {
-    SysPrintString("Open closed file: ");
     file = new MyOpenFile();
     file->file = kernel->fileSystem->Open(name);
     file->name = name;
-    _unclose_file.Insert(file);
-  } else {
-    SysPrintString("Open opened file: ");
-  }
+  } 
 
-  SysPrintString(name);
-  SysPrintString("\n");
-
+  // file is not exist
   if (file->file == 0) {
     kernel->machine->WriteRegister(2, 0);
     return;
   }
 
+  _unclose_file.Insert(file);
   kernel->machine->WriteRegister(2, (int)file);
 }
 
@@ -305,6 +338,8 @@ void _CaseOpen() {
   _IncreaseProgramCounter();
 }
 
+// ============================================================================================================
+
 void SysCreate(char *name) {
   bool check;
 #ifdef FILESYS_STUB
@@ -314,12 +349,12 @@ void SysCreate(char *name) {
 #endif
   
   
+  // return 0 if nothing happen
+  // return -1 if error
   if (check) 
     kernel->machine->WriteRegister(2, 0);
   else 
     kernel->machine->WriteRegister(2, -1);
-
-  //testhash(name);
 }
 
 void _CaseCreate() {

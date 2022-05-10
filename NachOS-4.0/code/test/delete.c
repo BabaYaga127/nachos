@@ -8,7 +8,7 @@ int ProgDelete(char* name, int namelen) {
     PrintString("Deleting file: ");
     check = Remove(name);
     PrintNum(check);
-    PrintString("\n\n");
+    PrintString("\n");
 
     return check;
 }
@@ -22,7 +22,7 @@ int main(){
 
     PrintString("File name: ");
     namelen = ReadString(name, 255);
-    PrintString("\n\n");
+    PrintString("\n");
     
     ProgDelete(name, namelen);
 
